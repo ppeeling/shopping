@@ -6,10 +6,16 @@ export function registerServiceWorker(onUpdateFound: () => void) {
       navigator.serviceWorker.register('./sw.js', { scope: './' }).then((reg) => {
         registration = reg;
 
-        // Check for updates periodically (every 5 minutes)
+        // Check for updates periodically (every 5 minutes) and when app becomes visible
         setInterval(() => {
           reg.update();
         }, 5 * 60 * 1000);
+
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            reg.update();
+          }
+        });
 
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;

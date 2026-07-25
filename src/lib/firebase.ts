@@ -96,54 +96,8 @@ function saveLocalHistory(history: HistoryItem[]) {
   }
 }
 
-// Default initial items if completely empty
-export const INITIAL_DEMO_ITEMS: Omit<GroceryItem, 'id'>[] = [
-  {
-    name: 'Organic Whole Milk',
-    quantity: '2 bottles',
-    section: 'Dairy & Eggs',
-    supermarkets: ['Tesco', "Sainsbury's"],
-    priority: 'high',
-    completed: false,
-    addedBy: 'paulpeeling@gmail.com',
-    createdAt: Date.now() - 3600000,
-    updatedAt: Date.now() - 3600000,
-  },
-  {
-    name: 'Sourdough Bread',
-    quantity: '1 loaf',
-    section: 'Bakery',
-    supermarkets: ['Marks & Spencer', 'Waitrose'],
-    priority: 'medium',
-    completed: false,
-    addedBy: 'huichiao45@gmail.com',
-    createdAt: Date.now() - 7200000,
-    updatedAt: Date.now() - 7200000,
-  },
-  {
-    name: 'Avocados',
-    quantity: '4 pack',
-    section: 'Produce',
-    supermarkets: ['Aldi', 'Lidl'],
-    priority: 'high',
-    completed: false,
-    notes: 'Pick ripe ones for guacamole',
-    addedBy: 'paulpeeling@gmail.com',
-    createdAt: Date.now() - 10800000,
-    updatedAt: Date.now() - 10800000,
-  },
-  {
-    name: 'Jasmine Rice (5kg)',
-    quantity: '1 bag',
-    section: 'Pantry & Grains',
-    supermarkets: ['Asian Supermarket'],
-    priority: 'low',
-    completed: false,
-    addedBy: 'huichiao45@gmail.com',
-    createdAt: Date.now() - 14400000,
-    updatedAt: Date.now() - 14400000,
-  }
-];
+// Default initial items if completely empty (set to empty list so no unrequested items are injected)
+export const INITIAL_DEMO_ITEMS: Omit<GroceryItem, 'id'>[] = [];
 
 // Firestore Realtime Subscriptions with Local Fallback sync
 export function subscribeToGroceryItems(
