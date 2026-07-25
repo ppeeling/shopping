@@ -1,0 +1,6 @@
+{
+  "name": "Shared Grocery List",
+  "description": "A shared PWA grocery shopping list app backed by Firebase with multi-supermarket tagging, section filtering, purchase history, offline support, and user authorization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
