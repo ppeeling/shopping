@@ -15,6 +15,7 @@ import {
   updateGroceryItem, 
   deleteGroceryItem, 
   clearCompletedItems,
+  ensureAuth,
   auth
 } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -110,12 +111,18 @@ export default function App() {
 
   // Sync Firebase Auth State
   useEffect(() => {
+    ensureAuth();
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user && user.email) {
-        const email = user.email.toLowerCase();
-        if (email === 'paulpeeling@gmail.com' || email === 'huichiao45@gmail.com') {
-          setCurrentUserEmail(email);
+      if (user) {
+        if (user.email) {
+          const email = user.email.toLowerCase();
+          if (email === 'paulpeeling@gmail.com' || email === 'huichiao45@gmail.com') {
+            setCurrentUserEmail(email);
+          }
         }
+      } else {
+        ensureAuth();
       }
     });
     return () => unsubscribeAuth();

@@ -55,7 +55,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
       section,
       supermarkets: selectedSupermarkets,
       priority,
-      notes: notes.trim() || undefined
+      notes: notes.trim() || ''
     });
 
     onClose();

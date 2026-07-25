@@ -6,16 +6,22 @@ import {
   getFirestore,
   collection,
   doc,
-  setDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
   query,
   orderBy,
-  addDoc,
-  serverTimestamp
+  addDoc
 } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged, User } from 'firebase/auth';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged, 
+  signInAnonymously,
+  User 
+} from 'firebase/auth';
 import firebaseConfigJson from '../../firebase-applet-config.json';
 import { GroceryItem, HistoryItem, AUTHORIZED_EMAILS, AUTHORIZED_USERS } from '../types';
 
@@ -52,13 +58,27 @@ export const googleProvider = new GoogleAuthProvider();
 
 export { db };
 
+// Helper to ensure Firebase user is authenticated (Google or Anonymous) so request.auth != null is always met
+export async function ensureAuth(): Promise<User | null> {
+  if (auth.currentUser) {
+    return auth.currentUser;
+  }
+  try {
+    const cred = await signInAnonymously(auth);
+    return cred.user;
+  } catch (err) {
+    console.warn('Authentication setup error:', err);
+    return null;
+  }
+}
+
 // Helper to check email authorization
 export function isUserAuthorized(email?: string | null): boolean {
   if (!email) return false;
   return AUTHORIZED_EMAILS.includes(email.toLowerCase());
 }
 
-// Local storage fallback keys for immediate offline responsiveness or offline fallback
+// Local storage fallback keys for immediate offline responsiveness
 const LOCAL_STORAGE_ITEMS_KEY = 'grocery_app_items_fallback_v1';
 const LOCAL_STORAGE_HISTORY_KEY = 'grocery_app_history_fallback_v1';
 
@@ -71,7 +91,6 @@ function getLocalItems(): GroceryItem[] {
   }
 }
 
-// Subscriber callbacks for local state updates
 const itemSubscribers = new Set<(items: GroceryItem[]) => void>();
 const historySubscribers = new Set<(history: HistoryItem[]) => void>();
 
@@ -102,7 +121,6 @@ function saveLocalHistory(history: HistoryItem[]) {
   }
 }
 
-// Default initial items if completely empty (set to empty list so no unrequested items are injected)
 export const INITIAL_DEMO_ITEMS: Omit<GroceryItem, 'id'>[] = [];
 
 // Firestore Realtime Subscriptions with Local Fallback sync
@@ -111,6 +129,7 @@ export function subscribeToGroceryItems(
   onError?: (error: Error) => void
 ) {
   itemSubscribers.add(callback);
+  ensureAuth();
 
   let unsubscribeFirestore: (() => void) | null = null;
 
@@ -119,16 +138,6 @@ export function subscribeToGroceryItems(
     unsubscribeFirestore = onSnapshot(
       q,
       (snapshot) => {
-        if (snapshot.empty && getLocalItems().length === 0) {
-          // Initialize default items if both remote and local are empty
-          const initial = INITIAL_DEMO_ITEMS.map((item, index) => ({
-            ...item,
-            id: `item-demo-${index}`
-          }));
-          saveLocalItems(initial);
-          return;
-        }
-
         const items: GroceryItem[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
@@ -144,36 +153,26 @@ export function subscribeToGroceryItems(
             addedBy: data.addedBy || 'paulpeeling@gmail.com',
             completedBy: data.completedBy,
             completedAt: data.completedAt,
-            createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : (data.createdAt || Date.now()),
-            updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : (data.updatedAt || Date.now())
+            createdAt: typeof data.createdAt === 'number' ? data.createdAt : (data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now()),
+            updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : (data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now())
           });
         });
 
-        // Save to local storage without re-triggering recursive loops if identical
         try {
           localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(items));
         } catch {}
         callback(items);
       },
       (err) => {
-        console.warn('Firestore subscription offline or error, falling back to local state:', err);
+        console.warn('Firestore subscription offline or error, using local state:', err);
         const local = getLocalItems();
-        if (local.length === 0) {
-          const initial = INITIAL_DEMO_ITEMS.map((item, index) => ({
-            ...item,
-            id: `item-demo-${index}`
-          }));
-          saveLocalItems(initial);
-        } else {
-          callback(local);
-        }
+        callback(local);
         if (onError) onError(err);
       }
     );
   } catch (err) {
     console.warn('Error setting up Firestore query, using local storage fallback:', err);
-    const local = getLocalItems();
-    callback(local);
+    callback(getLocalItems());
   }
 
   return () => {
@@ -186,6 +185,7 @@ export function subscribeToHistory(
   callback: (history: HistoryItem[]) => void
 ) {
   historySubscribers.add(callback);
+  ensureAuth();
 
   let unsubscribeFirestore: (() => void) | null = null;
 
@@ -204,7 +204,7 @@ export function subscribeToHistory(
             quantity: data.quantity || '1',
             section: data.section || 'Other',
             supermarkets: Array.isArray(data.supermarkets) ? data.supermarkets : [],
-            boughtAt: data.boughtAt?.toMillis ? data.boughtAt.toMillis() : (data.boughtAt || Date.now()),
+            boughtAt: typeof data.boughtAt === 'number' ? data.boughtAt : (data.boughtAt?.toMillis ? data.boughtAt.toMillis() : Date.now()),
             boughtBy: data.boughtBy || 'paulpeeling@gmail.com',
             timesBought: data.timesBought || 1
           });
@@ -229,26 +229,37 @@ export function subscribeToHistory(
   };
 }
 
+function cleanForFirestore<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const cleaned: Record<string, any> = {};
+  Object.keys(obj).forEach((key) => {
+    if (obj[key] !== undefined) {
+      cleaned[key] = obj[key];
+    }
+  });
+  return cleaned;
+}
+
 // Add Item
 export async function addGroceryItem(item: Omit<GroceryItem, 'id' | 'createdAt' | 'updatedAt'>) {
+  await ensureAuth();
   const now = Date.now();
-  const newItem: Omit<GroceryItem, 'id'> = {
+  const newItem = cleanForFirestore({
     ...item,
+    notes: item.notes || '',
     createdAt: now,
     updatedAt: now
-  };
+  });
 
   try {
-    await addDoc(collection(db, 'groceries'), {
-      ...newItem,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
+    await addDoc(collection(db, 'groceries'), newItem);
   } catch (err) {
     console.warn('Failed to add to Firestore, saving locally:', err);
     const local = getLocalItems();
     const created: GroceryItem = {
-      ...newItem,
+      ...item,
+      notes: item.notes || '',
+      createdAt: now,
+      updatedAt: now,
       id: `local-${now}-${Math.random().toString(36).substr(2, 4)}`
     };
     saveLocalItems([created, ...local]);
@@ -260,6 +271,7 @@ export async function toggleGroceryCompleted(
   item: GroceryItem, 
   currentUserEmail: string
 ) {
+  await ensureAuth();
   const newCompletedState = !item.completed;
   const now = Date.now();
 
@@ -268,11 +280,10 @@ export async function toggleGroceryCompleted(
     await updateDoc(itemRef, {
       completed: newCompletedState,
       completedBy: newCompletedState ? currentUserEmail : null,
-      completedAt: newCompletedState ? serverTimestamp() : null,
-      updatedAt: serverTimestamp()
+      completedAt: newCompletedState ? now : null,
+      updatedAt: now
     });
 
-    // If marked completed, also add or update History entry
     if (newCompletedState) {
       recordItemBoughtHistory(item, currentUserEmail);
     }
@@ -301,7 +312,8 @@ export async function toggleGroceryCompleted(
 
 // Record Item Purchase History
 async function recordItemBoughtHistory(item: GroceryItem, boughtBy: string) {
-  const historyData: Omit<HistoryItem, 'id'> = {
+  await ensureAuth();
+  const historyData = {
     itemId: item.id,
     name: item.name,
     quantity: item.quantity,
@@ -313,10 +325,7 @@ async function recordItemBoughtHistory(item: GroceryItem, boughtBy: string) {
   };
 
   try {
-    await addDoc(collection(db, 'history'), {
-      ...historyData,
-      boughtAt: serverTimestamp()
-    });
+    await addDoc(collection(db, 'history'), historyData);
   } catch {
     const localHist = getLocalHistory();
     const newHist: HistoryItem = {
@@ -329,12 +338,14 @@ async function recordItemBoughtHistory(item: GroceryItem, boughtBy: string) {
 
 // Update Item
 export async function updateGroceryItem(id: string, updates: Partial<GroceryItem>) {
+  await ensureAuth();
+  const cleanedUpdates = cleanForFirestore({
+    ...updates,
+    updatedAt: Date.now()
+  });
   try {
     const itemRef = doc(db, 'groceries', id);
-    await updateDoc(itemRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
+    await updateDoc(itemRef, cleanedUpdates);
   } catch (err) {
     console.warn('Failed to update Firestore, updating locally:', err);
     const local = getLocalItems();
@@ -345,6 +356,7 @@ export async function updateGroceryItem(id: string, updates: Partial<GroceryItem
 
 // Delete Item
 export async function deleteGroceryItem(id: string) {
+  await ensureAuth();
   try {
     await deleteDoc(doc(db, 'groceries', id));
   } catch (err) {
@@ -356,6 +368,7 @@ export async function deleteGroceryItem(id: string) {
 
 // Clear all completed items
 export async function clearCompletedItems(items: GroceryItem[]) {
+  await ensureAuth();
   const completed = items.filter(i => i.completed);
   for (const item of completed) {
     await deleteGroceryItem(item.id);

@@ -87,7 +87,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       section,
       supermarkets: selectedSupermarkets.length > 0 ? selectedSupermarkets : ['Tesco'],
       priority,
-      notes: notes.trim() || undefined
+      notes: notes.trim() || ''
     });
 
     // Reset form
