@@ -20,7 +20,7 @@ import firebaseConfigJson from '../../firebase-applet-config.json';
 import { GroceryItem, HistoryItem, AUTHORIZED_EMAILS, AUTHORIZED_USERS } from '../types';
 
 const firebaseConfig = {
-  apiKey: firebaseConfigJson.apiKey,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
   authDomain: firebaseConfigJson.authDomain,
   projectId: firebaseConfigJson.projectId,
   storageBucket: firebaseConfigJson.storageBucket,
