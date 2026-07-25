@@ -71,9 +71,14 @@ function getLocalItems(): GroceryItem[] {
   }
 }
 
+// Subscriber callbacks for local state updates
+const itemSubscribers = new Set<(items: GroceryItem[]) => void>();
+const historySubscribers = new Set<(history: HistoryItem[]) => void>();
+
 function saveLocalItems(items: GroceryItem[]) {
   try {
     localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(items));
+    itemSubscribers.forEach(cb => cb(items));
   } catch (err) {
     console.error('Failed to save to localStorage:', err);
   }
@@ -91,6 +96,7 @@ function getLocalHistory(): HistoryItem[] {
 function saveLocalHistory(history: HistoryItem[]) {
   try {
     localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(history));
+    historySubscribers.forEach(cb => cb(history));
   } catch (err) {
     console.error('Failed to save history to localStorage:', err);
   }
@@ -104,9 +110,13 @@ export function subscribeToGroceryItems(
   callback: (items: GroceryItem[]) => void,
   onError?: (error: Error) => void
 ) {
+  itemSubscribers.add(callback);
+
+  let unsubscribeFirestore: (() => void) | null = null;
+
   try {
     const q = query(collection(db, 'groceries'), orderBy('createdAt', 'desc'));
-    return onSnapshot(
+    unsubscribeFirestore = onSnapshot(
       q,
       (snapshot) => {
         if (snapshot.empty && getLocalItems().length === 0) {
@@ -116,7 +126,6 @@ export function subscribeToGroceryItems(
             id: `item-demo-${index}`
           }));
           saveLocalItems(initial);
-          callback(initial);
           return;
         }
 
@@ -140,7 +149,10 @@ export function subscribeToGroceryItems(
           });
         });
 
-        saveLocalItems(items);
+        // Save to local storage without re-triggering recursive loops if identical
+        try {
+          localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(items));
+        } catch {}
         callback(items);
       },
       (err) => {
@@ -152,7 +164,6 @@ export function subscribeToGroceryItems(
             id: `item-demo-${index}`
           }));
           saveLocalItems(initial);
-          callback(initial);
         } else {
           callback(local);
         }
@@ -163,16 +174,24 @@ export function subscribeToGroceryItems(
     console.warn('Error setting up Firestore query, using local storage fallback:', err);
     const local = getLocalItems();
     callback(local);
-    return () => {};
   }
+
+  return () => {
+    itemSubscribers.delete(callback);
+    if (unsubscribeFirestore) unsubscribeFirestore();
+  };
 }
 
 export function subscribeToHistory(
   callback: (history: HistoryItem[]) => void
 ) {
+  historySubscribers.add(callback);
+
+  let unsubscribeFirestore: (() => void) | null = null;
+
   try {
     const q = query(collection(db, 'history'), orderBy('boughtAt', 'desc'));
-    return onSnapshot(
+    unsubscribeFirestore = onSnapshot(
       q,
       (snapshot) => {
         const history: HistoryItem[] = [];
@@ -190,7 +209,9 @@ export function subscribeToHistory(
             timesBought: data.timesBought || 1
           });
         });
-        saveLocalHistory(history);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(history));
+        } catch {}
         callback(history);
       },
       (err) => {
@@ -200,8 +221,12 @@ export function subscribeToHistory(
     );
   } catch {
     callback(getLocalHistory());
-    return () => {};
   }
+
+  return () => {
+    historySubscribers.delete(callback);
+    if (unsubscribeFirestore) unsubscribeFirestore();
+  };
 }
 
 // Add Item
