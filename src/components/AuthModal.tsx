@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, LogIn, UserCheck, AlertCircle, Sparkles } from 'lucide-react';
+import { X, ShieldCheck, LogIn, UserCheck, AlertCircle, ExternalLink, Copy, Check } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { AUTHORIZED_EMAILS, AUTHORIZED_USERS } from '../types';
@@ -18,13 +18,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSelectUser
 }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
+
+  const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+
+  const handleCopyDomain = () => {
+    if (currentDomain) {
+      navigator.clipboard.writeText(currentDomain);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setErrorMsg(null);
+    setErrorCode(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const email = result.user.email?.toLowerCase();
@@ -36,9 +49,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       }
     } catch (err: any) {
-      console.warn('Google Sign-in failed or closed:', err);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg('Sign in popup could not be completed in preview window. You can select your profile below directly.');
+      console.warn('Google Sign-in popup result:', err);
+      const code = err.code || '';
+      setErrorCode(code);
+
+      if (code === 'auth/unauthorized-domain') {
+        setErrorMsg(`Domain "${currentDomain}" is not in Firebase Auth's Authorized Domains list.`);
+      } else if (code === 'auth/popup-blocked') {
+        setErrorMsg('Sign in popup was blocked by your browser. Please allow popups or open the app in a new tab.');
+      } else if (code === 'auth/popup-closed-by-user') {
+        setErrorMsg(null);
+      } else {
+        setErrorMsg('Sign-in popup is restricted in the preview window (iframe cross-origin restriction). Select your profile below directly or open in a new tab.');
       }
     } finally {
       setIsLoading(false);
@@ -71,9 +93,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
+          <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 text-xs space-y-2">
+            <div className="flex items-start gap-2 font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <span>{errorMsg}</span>
+            </div>
+
+            {errorCode === 'auth/unauthorized-domain' && currentDomain && (
+              <div className="pt-1.5 border-t border-amber-200/60 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300">
+                <p className="mb-1.5">Add this domain to <strong>Firebase Console → Authentication → Settings → Authorized Domains</strong>:</p>
+                <div className="flex items-center justify-between bg-amber-100/70 dark:bg-amber-900/60 p-2 rounded-xl font-mono text-[10px] break-all">
+                  <span>{currentDomain}</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyDomain}
+                    className="ml-2 shrink-0 p-1 bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 rounded-lg text-amber-900 dark:text-amber-100 transition-colors flex items-center gap-1"
+                  >
+                    {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-1 flex items-center justify-between text-[11px] text-amber-700 dark:text-amber-300">
+              <span>Quick fix: Select your profile below directly</span>
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold underline hover:text-amber-900 dark:hover:text-amber-100"
+              >
+                Open in new tab <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
           </div>
         )}
 
@@ -97,7 +150,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   }}
                   className={`w-full p-3.5 rounded-2xl border transition-all flex items-center justify-between text-left ${
                     isSelected
-                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20 shadow-sm'
                       : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200'
                   }`}
                 >
@@ -122,8 +175,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         </div>
 
-        {/* Google OAuth Button */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+        {/* Google OAuth Button & Standalone Link */}
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -133,6 +186,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <LogIn className="w-4 h-4" />
             {isLoading ? 'Verifying...' : 'Sign In with Google Account'}
           </button>
+
+          <a
+            href={window.location.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2 px-3 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-center flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Open in New Window for Popup OAuth</span>
+          </a>
         </div>
       </div>
     </div>
