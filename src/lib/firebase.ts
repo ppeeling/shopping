@@ -37,7 +37,7 @@ const firebaseConfig = {
 // Initialize App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Firestore with offline persistence
+// Initialize Firestore with reliable persistent cache (compatible with iOS WebKit)
 const dbId = firebaseConfigJson.firestoreDatabaseId && firebaseConfigJson.firestoreDatabaseId !== '(default)'
   ? firebaseConfigJson.firestoreDatabaseId
   : undefined;
@@ -45,9 +45,7 @@ const dbId = firebaseConfigJson.firestoreDatabaseId && firebaseConfigJson.firest
 let db: ReturnType<typeof getFirestore>;
 try {
   db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
+    localCache: persistentLocalCache({})
   }, dbId);
 } catch {
   db = dbId ? getFirestore(app, dbId) : getFirestore(app);
@@ -241,28 +239,40 @@ function cleanForFirestore<T extends Record<string, any>>(obj: T): Record<string
 
 // Add Item
 export async function addGroceryItem(item: Omit<GroceryItem, 'id' | 'createdAt' | 'updatedAt'>) {
-  await ensureAuth();
   const now = Date.now();
-  const newItem = cleanForFirestore({
+  const tempId = `local-${now}-${Math.random().toString(36).substr(2, 4)}`;
+  const created: GroceryItem = {
     ...item,
     notes: item.notes || '',
     createdAt: now,
-    updatedAt: now
-  });
+    updatedAt: now,
+    id: tempId
+  };
 
+  // 1. Save locally IMMEDIATELY so UI updates instantly on all devices (including iPhone)
+  const local = getLocalItems();
+  saveLocalItems([created, ...local]);
+
+  // 2. Sync with Firestore in background without blocking
   try {
-    await addDoc(collection(db, 'groceries'), newItem);
-  } catch (err) {
-    console.warn('Failed to add to Firestore, saving locally:', err);
-    const local = getLocalItems();
-    const created: GroceryItem = {
+    await ensureAuth();
+    const newItem = cleanForFirestore({
       ...item,
       notes: item.notes || '',
       createdAt: now,
-      updatedAt: now,
-      id: `local-${now}-${Math.random().toString(36).substr(2, 4)}`
-    };
-    saveLocalItems([created, ...local]);
+      updatedAt: now
+    });
+
+    const docRef = await addDoc(collection(db, 'groceries'), newItem);
+    
+    // Update local storage temp id with real firestore doc id if temp item still exists
+    const currentLocal = getLocalItems();
+    if (currentLocal.some(i => i.id === tempId)) {
+      const updatedLocal = currentLocal.map(i => i.id === tempId ? { ...created, id: docRef.id } : i);
+      saveLocalItems(updatedLocal);
+    }
+  } catch (err) {
+    console.warn('Firestore addDoc fallback (stored locally):', err);
   }
 }
 
@@ -271,48 +281,47 @@ export async function toggleGroceryCompleted(
   item: GroceryItem, 
   currentUserEmail: string
 ) {
-  await ensureAuth();
   const newCompletedState = !item.completed;
   const now = Date.now();
 
-  try {
-    const itemRef = doc(db, 'groceries', item.id);
-    await updateDoc(itemRef, {
-      completed: newCompletedState,
-      completedBy: newCompletedState ? currentUserEmail : null,
-      completedAt: newCompletedState ? now : null,
-      updatedAt: now
-    });
+  // Optimistic update locally
+  const local = getLocalItems();
+  const updated = local.map(i => {
+    if (i.id === item.id) {
+      return {
+        ...i,
+        completed: newCompletedState,
+        completedBy: newCompletedState ? currentUserEmail : undefined,
+        completedAt: newCompletedState ? now : undefined,
+        updatedAt: now
+      };
+    }
+    return i;
+  });
+  saveLocalItems(updated);
 
-    if (newCompletedState) {
-      recordItemBoughtHistory(item, currentUserEmail);
+  if (newCompletedState) {
+    recordItemBoughtHistory(item, currentUserEmail);
+  }
+
+  try {
+    await ensureAuth();
+    if (!item.id.startsWith('local-')) {
+      const itemRef = doc(db, 'groceries', item.id);
+      await updateDoc(itemRef, {
+        completed: newCompletedState,
+        completedBy: newCompletedState ? currentUserEmail : null,
+        completedAt: newCompletedState ? now : null,
+        updatedAt: now
+      });
     }
   } catch (err) {
-    console.warn('Failed to update Firestore, updating locally:', err);
-    const local = getLocalItems();
-    const updated = local.map(i => {
-      if (i.id === item.id) {
-        return {
-          ...i,
-          completed: newCompletedState,
-          completedBy: newCompletedState ? currentUserEmail : undefined,
-          completedAt: newCompletedState ? now : undefined,
-          updatedAt: now
-        };
-      }
-      return i;
-    });
-    saveLocalItems(updated);
-
-    if (newCompletedState) {
-      recordItemBoughtHistory(item, currentUserEmail);
-    }
+    console.warn('Firestore updateDoc fallback (stored locally):', err);
   }
 }
 
 // Record Item Purchase History
 async function recordItemBoughtHistory(item: GroceryItem, boughtBy: string) {
-  await ensureAuth();
   const historyData = {
     itemId: item.id,
     name: item.name,
@@ -324,51 +333,60 @@ async function recordItemBoughtHistory(item: GroceryItem, boughtBy: string) {
     timesBought: 1
   };
 
+  const localHist = getLocalHistory();
+  const newHist: HistoryItem = {
+    ...historyData,
+    id: `hist-${Date.now()}`
+  };
+  saveLocalHistory([newHist, ...localHist]);
+
   try {
+    await ensureAuth();
     await addDoc(collection(db, 'history'), historyData);
   } catch {
-    const localHist = getLocalHistory();
-    const newHist: HistoryItem = {
-      ...historyData,
-      id: `hist-${Date.now()}`
-    };
-    saveLocalHistory([newHist, ...localHist]);
+    // Keep local history
   }
 }
 
 // Update Item
 export async function updateGroceryItem(id: string, updates: Partial<GroceryItem>) {
-  await ensureAuth();
-  const cleanedUpdates = cleanForFirestore({
-    ...updates,
-    updatedAt: Date.now()
-  });
+  const now = Date.now();
+  const local = getLocalItems();
+  const updated = local.map(i => i.id === id ? { ...i, ...updates, updatedAt: now } : i);
+  saveLocalItems(updated);
+
   try {
-    const itemRef = doc(db, 'groceries', id);
-    await updateDoc(itemRef, cleanedUpdates);
+    await ensureAuth();
+    if (!id.startsWith('local-')) {
+      const cleanedUpdates = cleanForFirestore({
+        ...updates,
+        updatedAt: now
+      });
+      const itemRef = doc(db, 'groceries', id);
+      await updateDoc(itemRef, cleanedUpdates);
+    }
   } catch (err) {
-    console.warn('Failed to update Firestore, updating locally:', err);
-    const local = getLocalItems();
-    const updated = local.map(i => i.id === id ? { ...i, ...updates, updatedAt: Date.now() } : i);
-    saveLocalItems(updated);
+    console.warn('Firestore updateDoc fallback (stored locally):', err);
   }
 }
 
 // Delete Item
 export async function deleteGroceryItem(id: string) {
-  await ensureAuth();
+  const local = getLocalItems();
+  saveLocalItems(local.filter(i => i.id !== id));
+
   try {
-    await deleteDoc(doc(db, 'groceries', id));
+    await ensureAuth();
+    if (!id.startsWith('local-')) {
+      await deleteDoc(doc(db, 'groceries', id));
+    }
   } catch (err) {
-    console.warn('Failed to delete from Firestore, deleting locally:', err);
-    const local = getLocalItems();
-    saveLocalItems(local.filter(i => i.id !== id));
+    console.warn('Firestore deleteDoc fallback (stored locally):', err);
   }
 }
 
 // Clear all completed items
 export async function clearCompletedItems(items: GroceryItem[]) {
-  await ensureAuth();
   const completed = items.filter(i => i.completed);
   for (const item of completed) {
     await deleteGroceryItem(item.id);
