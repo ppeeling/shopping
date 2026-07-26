@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, LogIn, LogOut, AlertCircle, ExternalLink, Copy, Check, User as UserIcon } from 'lucide-react';
+import { X, ShieldCheck, LogIn, LogOut, AlertCircle, ExternalLink, Copy, Check, User as UserIcon, Info } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { AUTHORIZED_EMAILS, AUTHORIZED_USERS } from '../types';
@@ -25,6 +25,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const firebaseUser = auth.currentUser;
   const isSignedInWithGoogle = Boolean(firebaseUser && !firebaseUser.isAnonymous && firebaseUser.email);
   const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   const handleCopyDomain = () => {
     if (currentDomain) {
@@ -55,11 +56,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (code === 'auth/unauthorized-domain') {
         setErrorMsg(`Domain "${currentDomain}" is not in Firebase Auth's Authorized Domains list.`);
       } else if (code === 'auth/popup-blocked') {
-        setErrorMsg('Sign in popup was blocked by your browser. Please allow popups or open the app in a new tab.');
+        setErrorMsg('Sign in popup was blocked by your browser. Please allow popups or open the app in a standalone tab.');
       } else if (code === 'auth/popup-closed-by-user') {
         setErrorMsg(null);
+      } else if (isInIframe) {
+        setErrorMsg('Google OAuth blocks logins inside embedded iframe previews (showing "Safari too old" or "unsupported browser"). Click "Open in Standalone Window" below to sign in with Google.');
       } else {
-        setErrorMsg('Sign-in popup is restricted in the preview window (iframe cross-origin restriction). Please open the app in a new browser tab to sign in with Google.');
+        setErrorMsg('Google sign-in popup error. Please open the app in a standalone window.');
       }
     } finally {
       setIsLoading(false);
@@ -79,11 +82,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const activeEmail = (isSignedInWithGoogle ? firebaseUser?.email : currentUserEmail)?.toLowerCase() || '';
-  const knownUser = AUTHORIZED_USERS[activeEmail];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           type="button"
@@ -94,17 +96,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </button>
 
         {/* Modal Header */}
-        <div className="text-center mb-6 pt-2">
+        <div className="text-center mb-5 pt-2">
           <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 rounded-2xl mx-auto flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 shadow-inner">
             <ShieldCheck className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            Google Account Authentication
+            Account & Identity
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-            Your profile identity is strictly determined by who is logged in with Google auth.
+            Manage your Google account login or select your profile for family sharing.
           </p>
         </div>
+
+        {/* AI Studio IFrame Explanation Notice */}
+        {isInIframe && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900/60 text-sky-950 dark:text-sky-200 text-xs space-y-2">
+            <div className="flex items-start gap-2 font-semibold">
+              <Info className="w-4 h-4 shrink-0 mt-0.5 text-sky-600 dark:text-sky-400" />
+              <span>AI Studio Preview Environment Notice</span>
+            </div>
+            <p className="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+              Google OAuth blocks popup logins inside embedded preview frames (showing <em>"Safari too old"</em> or <em>"browser not supported"</em>).
+            </p>
+            <div className="pt-1 flex flex-col gap-1.5">
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2 px-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs text-center flex items-center justify-center gap-1.5 shadow-sm transition-all"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open in Standalone Window to Sign In</span>
+              </a>
+              <span className="text-[10px] text-sky-700 dark:text-sky-400 text-center">
+                On installed PWA or direct window, Google Login works natively!
+              </span>
+            </div>
+          </div>
+        )}
 
         {errorMsg && (
           <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 text-xs space-y-2">
@@ -131,7 +160,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
 
             <div className="pt-1 flex items-center justify-between text-[11px] text-amber-700 dark:text-amber-300">
-              <span>Try signing in via standalone tab:</span>
+              <span>Open in a direct window:</span>
               <a
                 href={window.location.href}
                 target="_blank"
@@ -145,9 +174,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {/* Current Google Account Status Card */}
-        <div className="mb-6">
+        <div className="mb-5">
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-            Logged-In Profile
+            Logged-In Status
           </label>
 
           {isSignedInWithGoogle && firebaseUser ? (
@@ -161,14 +190,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
-                    {knownUser?.avatar || '👤'}
+                    👤
                   </div>
                 )}
                 <div className="min-w-0">
                   <div className="font-bold text-sm truncate flex items-center gap-1.5">
-                    {firebaseUser.displayName || knownUser?.name || activeEmail.split('@')[0]}
+                    {firebaseUser.displayName || activeEmail.split('@')[0]}
                     <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                      Google Auth
+                      Google Verified
                     </span>
                   </div>
                   <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
@@ -178,14 +207,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-3">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 flex items-center justify-center shrink-0">
                 <UserIcon className="w-5 h-5" />
               </div>
-              <div>
-                <div className="font-semibold text-sm">Not Signed In with Google</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  Sign in below with your Google account to authorize updates as your profile.
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-xs">
+                  Not Signed In
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {isInIframe ? 'Open in standalone window to sign in with Google.' : 'Sign in below with your Google account.'}
                 </div>
               </div>
             </div>
@@ -223,7 +254,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             className="w-full py-2 px-3 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-center flex items-center justify-center gap-1.5 transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            <span>Open in New Window for Popup OAuth</span>
+            <span>Open in Standalone Window for Google Auth</span>
           </a>
         </div>
       </div>
@@ -232,4 +263,5 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 };
 
 export default AuthModal;
+
 

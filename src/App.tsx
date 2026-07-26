@@ -46,7 +46,7 @@ export default function App() {
     return true;
   });
 
-  // Current Active User based on Google Auth
+  // Current Active User (Google Auth)
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
 
   // Network & PWA States
@@ -194,6 +194,14 @@ export default function App() {
     await toggleGroceryCompleted(item, activeEmail);
   };
 
+  const handleOpenAddModal = () => {
+    if (!currentUserEmail) {
+      setIsAuthModalOpen(true);
+    } else {
+      setIsAddModalOpen(true);
+    }
+  };
+
   const handleAddItem = async (item: {
     name: string;
     quantity: string;
@@ -202,11 +210,14 @@ export default function App() {
     priority: PriorityLevel;
     notes?: string;
   }) => {
-    const activeEmail = currentUserEmail || auth.currentUser?.email?.toLowerCase() || 'paulpeeling@gmail.com';
+    if (!currentUserEmail) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     await addGroceryItem({
       ...item,
       completed: false,
-      addedBy: activeEmail
+      addedBy: currentUserEmail
     });
   };
 
@@ -272,7 +283,7 @@ export default function App() {
                   {filter.status !== 'completed' && (
                     <button
                       type="button"
-                      onClick={() => setIsAddModalOpen(true)}
+                      onClick={handleOpenAddModal}
                       className="mt-4 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-2xl transition-all shadow-md active:scale-95 inline-flex items-center gap-1.5"
                     >
                       <Plus className="w-4 h-4" />
@@ -345,7 +356,13 @@ export default function App() {
         {activeTab === 'history' && (
           <HistoryView
             history={history}
+            currentUserEmail={currentUserEmail}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
             onReAddToList={(item) => {
+              if (!currentUserEmail) {
+                setIsAuthModalOpen(true);
+                return;
+              }
               handleAddItem({
                 ...item,
                 priority: 'medium'
@@ -360,7 +377,7 @@ export default function App() {
       <BottomNav
         activeTab={activeTab}
         onChangeTab={setActiveTab}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
+        onOpenAddModal={handleOpenAddModal}
         activeItemsCount={activeItemsCount}
       />
 
@@ -369,6 +386,8 @@ export default function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddItem={handleAddItem}
+        currentUserEmail={currentUserEmail}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       <EditItemModal

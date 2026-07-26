@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, AlertCircle, LogIn } from 'lucide-react';
 import { DEFAULT_SECTIONS, DEFAULT_SUPERMARKETS, PriorityLevel, SECTION_ICONS } from '../types';
 
 interface AddItemModalProps {
@@ -15,6 +15,8 @@ interface AddItemModalProps {
   }) => void;
   initialName?: string;
   initialSupermarket?: string;
+  currentUserEmail?: string;
+  onOpenAuth?: () => void;
 }
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({
@@ -22,7 +24,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   onClose,
   onAddItem,
   initialName = '',
-  initialSupermarket = 'Tesco'
+  initialSupermarket = 'Tesco',
+  currentUserEmail = '',
+  onOpenAuth
 }) => {
   const [name, setName] = useState(initialName);
   const [quantity, setQuantity] = useState('1');
@@ -55,6 +59,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUserEmail) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
     if (!name.trim()) return;
 
     onAddItem({
@@ -92,6 +100,27 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
             Add Grocery Item
           </h2>
         </div>
+
+        {!currentUserEmail && (
+          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-2xl flex items-center justify-between gap-2 text-xs text-amber-900 dark:text-amber-200">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Google Sign-In is required to create items.</span>
+            </div>
+            {onOpenAuth && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenAuth();
+                }}
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shrink-0 shadow-xs"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Item Name */}
@@ -210,13 +239,27 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
           {/* Submit Button */}
           <div className="pt-2">
-            <button
-              type="submit"
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-98 flex items-center justify-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add to Grocery List
-            </button>
+            {!currentUserEmail ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenAuth) onOpenAuth();
+                }}
+                className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-2xl text-sm transition-all shadow-md active:scale-98 flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign In with Google to Add Item
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-98 flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add to Grocery List
+              </button>
+            )}
           </div>
         </form>
       </div>

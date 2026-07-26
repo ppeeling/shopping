@@ -4,6 +4,8 @@ import { HistoryItem, SECTION_ICONS, AUTHORIZED_USERS } from '../types';
 
 interface HistoryViewProps {
   history: HistoryItem[];
+  currentUserEmail?: string;
+  onOpenAuth?: () => void;
   onReAddToList: (item: {
     name: string;
     quantity: string;
@@ -12,7 +14,7 @@ interface HistoryViewProps {
   }) => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, onReAddToList }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ history, currentUserEmail = '', onOpenAuth, onReAddToList }) => {
   const [search, setSearch] = useState('');
 
   const filteredHistory = history.filter(h => 
@@ -118,12 +120,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, onReAddToList
                 {/* Re-add Button */}
                 <button
                   type="button"
-                  onClick={() => onReAddToList({
-                    name: item.name,
-                    quantity: item.quantity,
-                    section: item.section,
-                    supermarkets: item.supermarkets && item.supermarkets.length ? item.supermarkets : ['Tesco']
-                  })}
+                  onClick={() => {
+                    if (!currentUserEmail) {
+                      if (onOpenAuth) onOpenAuth();
+                      return;
+                    }
+                    onReAddToList({
+                      name: item.name,
+                      quantity: item.quantity,
+                      section: item.section,
+                      supermarkets: item.supermarkets && item.supermarkets.length ? item.supermarkets : ['Tesco']
+                    });
+                  }}
                   className="px-3 py-2 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0 active:scale-95"
                   title="Add back to current shopping list"
                 >
