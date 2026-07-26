@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Camera, Trash2, Loader2 } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { DEFAULT_SECTIONS, DEFAULT_SUPERMARKETS, PriorityLevel, SECTION_ICONS } from '../types';
-import { compressImage } from '../lib/imageUtils';
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -13,7 +12,6 @@ interface AddItemModalProps {
     supermarkets: string[];
     priority: PriorityLevel;
     notes?: string;
-    imageUrl?: string;
   }) => void;
   initialName?: string;
   initialSupermarket?: string;
@@ -32,42 +30,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [selectedSupermarkets, setSelectedSupermarkets] = useState<string[]>([initialSupermarket]);
   const [priority, setPriority] = useState<PriorityLevel>('medium');
   const [notes, setNotes] = useState('');
-  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
-  const [isCompressing, setIsCompressing] = useState(false);
 
   useEffect(() => {
     if (initialName) {
       setName(initialName);
-      autoSuggestSection(initialName);
     }
   }, [initialName]);
 
   if (!isOpen) return null;
 
-  const autoSuggestSection = (itemName: string) => {
-    const lower = itemName.toLowerCase();
-    if (lower.includes('milk') || lower.includes('cheese') || lower.includes('butter') || lower.includes('egg') || lower.includes('yogurt') || lower.includes('cream')) {
-      setSection('Dairy & Eggs');
-    } else if (lower.includes('bread') || lower.includes('toast') || lower.includes('croissant') || lower.includes('bagel') || lower.includes('bun') || lower.includes('muffin')) {
-      setSection('Bakery');
-    } else if (lower.includes('apple') || lower.includes('banana') || lower.includes('tomato') || lower.includes('lemon') || lower.includes('salad') || lower.includes('spinach') || lower.includes('potato') || lower.includes('onion') || lower.includes('avocado') || lower.includes('berry') || lower.includes('garlic')) {
-      setSection('Produce');
-    } else if (lower.includes('chicken') || lower.includes('beef') || lower.includes('pork') || lower.includes('salmon') || lower.includes('fish') || lower.includes('steak') || lower.includes('bacon') || lower.includes('mince')) {
-      setSection('Meat & Seafood');
-    } else if (lower.includes('rice') || lower.includes('pasta') || lower.includes('noodle') || lower.includes('flour') || lower.includes('oil') || lower.includes('sugar') || lower.includes('sauce') || lower.includes('salt') || lower.includes('can')) {
-      setSection('Pantry & Grains');
-    } else if (lower.includes('ice') || lower.includes('frozen') || lower.includes('pizza') || lower.includes('peas')) {
-      setSection('Frozen Foods');
-    } else if (lower.includes('crisps') || lower.includes('chip') || lower.includes('chocolate') || lower.includes('cookie') || lower.includes('biscuit') || lower.includes('juice') || lower.includes('water') || lower.includes('coffee') || lower.includes('tea') || lower.includes('coke') || lower.includes('beer')) {
-      setSection('Snacks & Beverages');
-    } else if (lower.includes('paper') || lower.includes('soap') || lower.includes('trash') || lower.includes('foil') || lower.includes('clean') || lower.includes('detergent') || lower.includes('sponge')) {
-      setSection('Household & Cleaning');
-    }
-  };
-
   const handleNameChange = (val: string) => {
     setName(val);
-    autoSuggestSection(val);
   };
 
   const toggleSupermarket = (store: string) => {
@@ -77,21 +50,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       }
     } else {
       setSelectedSupermarkets([...selectedSupermarkets, store]);
-    }
-  };
-
-  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsCompressing(true);
-      const compressed = await compressImage(file);
-      setImageUrl(compressed);
-    } catch (err) {
-      console.error('Failed to compress image:', err);
-    } finally {
-      setIsCompressing(false);
     }
   };
 
@@ -105,15 +63,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       section,
       supermarkets: selectedSupermarkets.length > 0 ? selectedSupermarkets : ['Tesco'],
       priority,
-      notes: notes.trim() || '',
-      imageUrl
+      notes: notes.trim() || ''
     });
 
     // Reset form
     setName('');
     setQuantity('1');
     setNotes('');
-    setImageUrl(undefined);
     onClose();
   };
 
@@ -152,51 +108,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
               placeholder="e.g. Organic Milk, Avocados, Sourdough"
               className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-sm"
             />
-          </div>
-
-          {/* Photo / Image Upload */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Photo / Image (Optional)
-            </label>
-            {imageUrl ? (
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 max-h-48 flex items-center justify-center">
-                <img
-                  src={imageUrl}
-                  alt="Item photo"
-                  className="max-h-48 w-full object-contain bg-slate-950/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => setImageUrl(undefined)}
-                  className="absolute top-2 right-2 p-1.5 rounded-full bg-rose-600 text-white hover:bg-rose-700 shadow-md transition-all"
-                  title="Remove photo"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer transition-colors">
-                {isCompressing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-                    <span>Processing photo...</span>
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>Take Photo or Choose Image</span>
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageFileChange}
-                  className="hidden"
-                  disabled={isCompressing}
-                />
-              </label>
-            )}
           </div>
 
           {/* Quantity & Priority */}
@@ -301,8 +212,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isCompressing}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-98 flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-98 flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Add to Grocery List

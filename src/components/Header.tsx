@@ -1,7 +1,8 @@
 import React from 'react';
-import { ShoppingCart, UserCheck, ShieldCheck, RefreshCw } from 'lucide-react';
+import { ShoppingCart, ShieldCheck, LogIn, User as UserIcon } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { AUTHORIZED_USERS } from '../types';
+import { auth } from '../lib/firebase';
 
 interface HeaderProps {
   currentUserEmail: string;
@@ -20,9 +21,13 @@ export const Header: React.FC<HeaderProps> = ({
   activeItemsCount,
   completedItemsCount
 }) => {
-  const userObj = AUTHORIZED_USERS[currentUserEmail] || {
-    email: currentUserEmail,
-    name: currentUserEmail.split('@')[0],
+  const firebaseUser = auth.currentUser;
+  const isSignedInWithGoogle = Boolean(firebaseUser && !firebaseUser.isAnonymous && firebaseUser.email);
+  const activeEmail = (isSignedInWithGoogle ? firebaseUser?.email : currentUserEmail)?.toLowerCase() || '';
+
+  const userObj = AUTHORIZED_USERS[activeEmail] || {
+    email: activeEmail,
+    name: firebaseUser?.displayName || (activeEmail ? activeEmail.split('@')[0] : 'Guest'),
     avatar: '👤'
   };
 
@@ -49,18 +54,35 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right actions: User Switcher & Theme Toggle */}
+        {/* Right actions: Google Auth Badge & Theme Toggle */}
         <div className="flex items-center gap-2">
-          {/* User badge */}
+          {/* User badge / Google Auth */}
           <button
             type="button"
             onClick={onOpenAuth}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-medium text-slate-200 transition-all active:scale-95"
-            title="Click to switch user or sign in"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all active:scale-95 ${
+              isSignedInWithGoogle
+                ? 'bg-emerald-950/60 hover:bg-emerald-900/80 border-emerald-500/40 text-emerald-200'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-200'
+            }`}
+            title={isSignedInWithGoogle ? `Signed in as ${activeEmail}` : 'Sign in with Google'}
           >
-            <span className="text-base">{userObj.avatar}</span>
-            <span className="hidden sm:inline font-medium text-slate-200">{userObj.name.split(' ')[0]}</span>
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            {isSignedInWithGoogle ? (
+              <>
+                {firebaseUser?.photoURL ? (
+                  <img src={firebaseUser.photoURL} alt="Avatar" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                ) : (
+                  <span className="text-sm">{userObj.avatar}</span>
+                )}
+                <span className="hidden sm:inline font-medium text-emerald-100">{userObj.name.split(' ')[0]}</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              </>
+            ) : (
+              <>
+                <LogIn className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="font-medium text-slate-200">Sign In</span>
+              </>
+            )}
           </button>
 
           {/* Theme Toggle */}
@@ -72,3 +94,4 @@ export const Header: React.FC<HeaderProps> = ({
 };
 
 export default Header;
+

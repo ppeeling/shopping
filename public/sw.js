@@ -41,68 +41,9 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Helper to store shared target data (text & image) into IndexedDB
-function saveSharedDataToIDB(data) {
-  return new Promise((resolve) => {
-    const request = indexedDB.open('grocery_share_db', 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('shared_data')) {
-        db.createObjectStore('shared_data');
-      }
-    };
-    request.onsuccess = (e) => {
-      const db = e.target.result;
-      const tx = db.transaction('shared_data', 'readwrite');
-      const store = tx.objectStore('shared_data');
-      store.put(data, 'latest');
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-    };
-    request.onerror = () => resolve();
-  });
-}
-
 // Fetch Event
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-
-  // Intercept POST requests from Web Share Target (e.g. from iOS Share Sheet)
-  if (event.request.method === 'POST') {
-    event.respondWith(
-      (async () => {
-        try {
-          const formData = await event.request.formData();
-          const title = formData.get('title') || '';
-          const text = formData.get('text') || '';
-          const sharedUrl = formData.get('url') || '';
-          const file = formData.get('image') || formData.get('file');
-
-          let imageUrl = '';
-          if (file && file instanceof File && file.size > 0) {
-            imageUrl = await new Promise((res) => {
-              const reader = new FileReader();
-              reader.onload = () => res(reader.result);
-              reader.onerror = () => res('');
-              reader.readAsDataURL(file);
-            });
-          }
-
-          await saveSharedDataToIDB({
-            title: String(title),
-            text: String(text),
-            url: String(sharedUrl),
-            imageUrl,
-            timestamp: Date.now()
-          });
-        } catch (err) {
-          console.error('Error handling Web Share Target POST:', err);
-        }
-        return Response.redirect('./?shared=true', 303);
-      })()
-    );
-    return;
-  }
 
   // Skip caching Firestore webchannel/websocket requests
   if (url.pathname.includes('firestore') || url.hostname.includes('googleapis')) {

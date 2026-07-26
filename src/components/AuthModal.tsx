@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, LogIn, UserCheck, AlertCircle, ExternalLink, Copy, Check } from 'lucide-react';
+import { X, ShieldCheck, LogIn, LogOut, AlertCircle, ExternalLink, Copy, Check, User as UserIcon } from 'lucide-react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { AUTHORIZED_EMAILS, AUTHORIZED_USERS } from '../types';
@@ -8,14 +8,12 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUserEmail: string;
-  onSelectUser: (email: string) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   currentUserEmail,
-  onSelectUser
 }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -24,6 +22,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  const firebaseUser = auth.currentUser;
+  const isSignedInWithGoogle = Boolean(firebaseUser && !firebaseUser.isAnonymous && firebaseUser.email);
   const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
 
   const handleCopyDomain = () => {
@@ -41,11 +41,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const email = result.user.email?.toLowerCase();
-      if (!email || !AUTHORIZED_EMAILS.includes(email)) {
+      if (email && !AUTHORIZED_EMAILS.includes(email)) {
         await signOut(auth);
-        setErrorMsg(`Access Denied: ${email || 'This account'} is not authorized. Only paulpeeling@gmail.com and huichiao45@gmail.com can access this list.`);
+        setErrorMsg(`Access Denied: ${email} is not authorized. Only authorized family members can access this list.`);
       } else {
-        onSelectUser(email);
         onClose();
       }
     } catch (err: any) {
@@ -60,12 +59,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else if (code === 'auth/popup-closed-by-user') {
         setErrorMsg(null);
       } else {
-        setErrorMsg('Sign-in popup is restricted in the preview window (iframe cross-origin restriction). Select your profile below directly or open in a new tab.');
+        setErrorMsg('Sign-in popup is restricted in the preview window (iframe cross-origin restriction). Please open the app in a new browser tab to sign in with Google.');
       }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleSignOut = async () => {
+    setIsLoading(true);
+    try {
+      await signOut(auth);
+      onClose();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const activeEmail = (isSignedInWithGoogle ? firebaseUser?.email : currentUserEmail)?.toLowerCase() || '';
+  const knownUser = AUTHORIZED_USERS[activeEmail];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
@@ -85,10 +99,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <ShieldCheck className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            Authorized Family Access
+            Google Account Authentication
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-            This shared grocery list is strictly restricted to Paul & Hui-Chiao.
+            Your profile identity is strictly determined by who is logged in with Google auth.
           </p>
         </div>
 
@@ -117,7 +131,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
 
             <div className="pt-1 flex items-center justify-between text-[11px] text-amber-700 dark:text-amber-300">
-              <span>Quick fix: Select your profile below directly</span>
+              <span>Try signing in via standalone tab:</span>
               <a
                 href={window.location.href}
                 target="_blank"
@@ -130,62 +144,77 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
-        {/* Quick Identity Switcher for Both Family Members */}
+        {/* Current Google Account Status Card */}
         <div className="mb-6">
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-            Select Active Profile
+            Logged-In Profile
           </label>
-          <div className="space-y-2.5">
-            {AUTHORIZED_EMAILS.map((email) => {
-              const userObj = AUTHORIZED_USERS[email];
-              const isSelected = currentUserEmail === email;
 
-              return (
-                <button
-                  key={email}
-                  type="button"
-                  onClick={() => {
-                    onSelectUser(email);
-                    onClose();
-                  }}
-                  className={`w-full p-3.5 rounded-2xl border transition-all flex items-center justify-between text-left ${
-                    isSelected
-                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20 shadow-sm'
-                      : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{userObj.avatar}</span>
-                    <div>
-                      <div className="font-semibold text-sm flex items-center gap-1.5">
-                        {userObj.name}
-                        {isSelected && (
-                          <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded-full">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">{userObj.email}</div>
-                    </div>
+          {isSignedInWithGoogle && firebaseUser ? (
+            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/50 text-slate-900 dark:text-slate-100 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 overflow-hidden">
+                {firebaseUser.photoURL ? (
+                  <img
+                    src={firebaseUser.photoURL}
+                    alt="Profile"
+                    className="w-12 h-12 rounded-full border border-emerald-500/30 object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
+                    {knownUser?.avatar || '👤'}
                   </div>
-                  <UserCheck className={`w-5 h-5 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`} />
-                </button>
-              );
-            })}
-          </div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-bold text-sm truncate flex items-center gap-1.5">
+                    {firebaseUser.displayName || knownUser?.name || activeEmail.split('@')[0]}
+                    <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                      Google Auth
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                    {firebaseUser.email}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 flex items-center justify-center shrink-0">
+                <UserIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm">Not Signed In with Google</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Sign in below with your Google account to authorize updates as your profile.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Google OAuth Button & Standalone Link */}
+        {/* Google OAuth Action / Sign Out */}
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
-            className="w-full py-3 px-4 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 font-semibold rounded-2xl text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-98 disabled:opacity-50"
-          >
-            <LogIn className="w-4 h-4" />
-            {isLoading ? 'Verifying...' : 'Sign In with Google Account'}
-          </button>
+          {isSignedInWithGoogle ? (
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isLoading}
+              className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-2xl text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-98 disabled:opacity-50"
+            >
+              <LogOut className="w-4 h-4" />
+              {isLoading ? 'Signing Out...' : 'Sign Out of Google Account'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="w-full py-3 px-4 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-200 font-semibold rounded-2xl text-sm transition-all flex items-center justify-center gap-2 shadow-md active:scale-98 disabled:opacity-50"
+            >
+              <LogIn className="w-4 h-4" />
+              {isLoading ? 'Signing In...' : 'Sign In with Google Account'}
+            </button>
+          )}
 
           <a
             href={window.location.href}
@@ -203,3 +232,4 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 };
 
 export default AuthModal;
+

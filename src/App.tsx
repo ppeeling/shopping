@@ -19,7 +19,7 @@ import {
   auth
 } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { registerServiceWorker, reloadToUpdateSW, parseSharedTargetContent, SharedData } from './lib/pwa';
+import { registerServiceWorker, reloadToUpdateSW } from './lib/pwa';
 
 // Modular React Components (Each in its own file as required)
 import Header from './components/Header';
@@ -33,7 +33,6 @@ import AuthModal from './components/AuthModal';
 import OfflineBanner from './components/OfflineBanner';
 import UpdateNotification from './components/UpdateNotification';
 import IPhoneInstallPrompt from './components/IPhoneInstallPrompt';
-import ShareTargetModal from './components/ShareTargetModal';
 import BottomNav from './components/BottomNav';
 
 import { ShoppingBag, CheckCircle2, Trash2, Plus, Sparkles } from 'lucide-react';
@@ -47,13 +46,12 @@ export default function App() {
     return true;
   });
 
-  // Current Active User (Paul or Hui-Chiao)
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('paulpeeling@gmail.com');
+  // Current Active User based on Google Auth
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
 
   // Network & PWA States
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
   const [hasUpdate, setHasUpdate] = useState<boolean>(false);
-  const [sharedData, setSharedData] = useState<SharedData | null>(null);
 
   // Active Navigation Tab: 'list' | 'supermarket' | 'history'
   const [activeTab, setActiveTab] = useState<'list' | 'supermarket' | 'history'>('list');
@@ -99,41 +97,20 @@ export default function App() {
     };
   }, []);
 
-  // Register PWA Service Worker & Parse Share Target parameters
+  // Register PWA Service Worker
   useEffect(() => {
     registerServiceWorker(() => setHasUpdate(true));
-
-    const checkSharedContent = async () => {
-      const shared = await parseSharedTargetContent();
-      if (shared) {
-        setSharedData(shared);
-      }
-    };
-    checkSharedContent();
-
-    // Also listen for visibility change to re-check if app comes to foreground after sharing
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkSharedContent();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // Sync Firebase Auth State
+  // Sync Firebase Auth State strictly from Google Auth
   useEffect(() => {
     ensureAuth();
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        if (user.email) {
-          const email = user.email.toLowerCase();
-          if (email === 'paulpeeling@gmail.com' || email === 'huichiao45@gmail.com') {
-            setCurrentUserEmail(email);
-          }
-        }
+      if (user && !user.isAnonymous && user.email) {
+        setCurrentUserEmail(user.email.toLowerCase());
       } else {
+        setCurrentUserEmail('');
         ensureAuth();
       }
     });
@@ -213,7 +190,8 @@ export default function App() {
 
   // Handlers
   const handleToggleComplete = async (item: GroceryItem) => {
-    await toggleGroceryCompleted(item, currentUserEmail);
+    const activeEmail = currentUserEmail || auth.currentUser?.email?.toLowerCase() || 'paulpeeling@gmail.com';
+    await toggleGroceryCompleted(item, activeEmail);
   };
 
   const handleAddItem = async (item: {
@@ -223,12 +201,12 @@ export default function App() {
     supermarkets: string[];
     priority: PriorityLevel;
     notes?: string;
-    imageUrl?: string;
   }) => {
+    const activeEmail = currentUserEmail || auth.currentUser?.email?.toLowerCase() || 'paulpeeling@gmail.com';
     await addGroceryItem({
       ...item,
       completed: false,
-      addedBy: currentUserEmail
+      addedBy: activeEmail
     });
   };
 
@@ -404,14 +382,6 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         currentUserEmail={currentUserEmail}
-        onSelectUser={setCurrentUserEmail}
-      />
-
-      {/* Share Target Modal for Shared Content */}
-      <ShareTargetModal
-        sharedData={sharedData}
-        onClose={() => setSharedData(null)}
-        onAddItem={handleAddItem}
       />
 
       {/* iPhone Add to Home Screen Instructions */}

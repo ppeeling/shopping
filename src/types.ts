@@ -9,7 +9,6 @@ export interface GroceryItem {
   priority: PriorityLevel;
   completed: boolean;
   notes?: string;
-  imageUrl?: string;
   addedBy: string;
   completedBy?: string;
   completedAt?: number;

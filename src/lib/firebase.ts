@@ -153,7 +153,6 @@ export function subscribeToGroceryItems(
             priority: data.priority || 'medium',
             completed: Boolean(data.completed),
             notes: data.notes || '',
-            imageUrl: data.imageUrl || undefined,
             addedBy: data.addedBy || 'paulpeeling@gmail.com',
             completedBy: data.completedBy,
             completedAt: data.completedAt,
