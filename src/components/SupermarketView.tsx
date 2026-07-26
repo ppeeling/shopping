@@ -9,6 +9,7 @@ interface SupermarketViewProps {
   onToggleComplete: (item: GroceryItem) => void;
   onEdit: (item: GroceryItem) => void;
   onDelete: (id: string) => void;
+  onUpdateQuantity?: (id: string, newQuantity: string) => void;
 }
 
 export const SupermarketView: React.FC<SupermarketViewProps> = ({
@@ -16,7 +17,8 @@ export const SupermarketView: React.FC<SupermarketViewProps> = ({
   currentUserEmail,
   onToggleComplete,
   onEdit,
-  onDelete
+  onDelete,
+  onUpdateQuantity
 }) => {
   const [selectedStore, setSelectedStore] = useState<string>('Tesco');
 
@@ -25,8 +27,13 @@ export const SupermarketView: React.FC<SupermarketViewProps> = ({
     i.supermarkets && i.supermarkets.includes(selectedStore)
   );
 
-  const activeStoreItems = storeItems.filter(i => !i.completed);
-  const completedStoreItems = storeItems.filter(i => i.completed);
+  const activeStoreItems = storeItems
+    .filter(i => !i.completed)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+  const completedStoreItems = storeItems
+    .filter(i => i.completed)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
   // Group active store items by section
   const sectionsWithItems = DEFAULT_SECTIONS.filter(sec => 
@@ -118,6 +125,7 @@ export const SupermarketView: React.FC<SupermarketViewProps> = ({
                       onToggleComplete={onToggleComplete}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      onUpdateQuantity={onUpdateQuantity}
                     />
                   ))}
                 </div>
@@ -142,6 +150,7 @@ export const SupermarketView: React.FC<SupermarketViewProps> = ({
                 onToggleComplete={onToggleComplete}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onUpdateQuantity={onUpdateQuantity}
               />
             ))}
           </div>

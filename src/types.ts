@@ -30,7 +30,7 @@ export interface HistoryItem {
 
 export interface FilterState {
   search: string;
-  section: string; // 'all' or section name
+  section: string; // 'all' (grouped) | 'flat' (flat list) | section name
   supermarket: string; // 'all' or supermarket name
   priority: string; // 'all' | 'high' | 'medium' | 'low'
   status: 'active' | 'completed' | 'all';

@@ -15,6 +15,8 @@ import {
   updateGroceryItem, 
   deleteGroceryItem, 
   clearCompletedItems,
+  deleteHistoryItem,
+  clearAllHistory,
   ensureAuth,
   auth
 } from './lib/firebase';
@@ -25,6 +27,7 @@ import { registerServiceWorker, reloadToUpdateSW } from './lib/pwa';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import SectionGroup from './components/SectionGroup';
+import GroceryItemCard from './components/GroceryItemCard';
 import AddItemModal from './components/AddItemModal';
 import EditItemModal from './components/EditItemModal';
 import HistoryView from './components/HistoryView';
@@ -134,37 +137,39 @@ export default function App() {
     };
   }, []);
 
-  // Filtered Grocery Items
+  // Filtered Grocery Items (Sorted alphabetically by name)
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      // Status filter
-      if (filter.status === 'active' && item.completed) return false;
-      if (filter.status === 'completed' && !item.completed) return false;
+    return items
+      .filter((item) => {
+        // Status filter
+        if (filter.status === 'active' && item.completed) return false;
+        if (filter.status === 'completed' && !item.completed) return false;
 
-      // Search text
-      if (filter.search) {
-        const query = filter.search.toLowerCase();
-        const matchName = item.name.toLowerCase().includes(query);
-        const matchSection = item.section.toLowerCase().includes(query);
-        const matchNotes = item.notes?.toLowerCase().includes(query) || false;
-        if (!matchName && !matchSection && !matchNotes) return false;
-      }
-
-      // Section filter
-      if (filter.section !== 'all' && item.section !== filter.section) return false;
-
-      // Supermarket filter
-      if (filter.supermarket !== 'all') {
-        if (!item.supermarkets || !item.supermarkets.includes(filter.supermarket)) {
-          return false;
+        // Search text
+        if (filter.search) {
+          const query = filter.search.toLowerCase();
+          const matchName = item.name.toLowerCase().includes(query);
+          const matchSection = item.section.toLowerCase().includes(query);
+          const matchNotes = item.notes?.toLowerCase().includes(query) || false;
+          if (!matchName && !matchSection && !matchNotes) return false;
         }
-      }
 
-      // Priority filter
-      if (filter.priority !== 'all' && item.priority !== filter.priority) return false;
+        // Section filter
+        if (filter.section !== 'all' && filter.section !== 'flat' && item.section !== filter.section) return false;
 
-      return true;
-    });
+        // Supermarket filter
+        if (filter.supermarket !== 'all') {
+          if (!item.supermarkets || !item.supermarkets.includes(filter.supermarket)) {
+            return false;
+          }
+        }
+
+        // Priority filter
+        if (filter.priority !== 'all' && item.priority !== filter.priority) return false;
+
+        return true;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
   }, [items, filter]);
 
   // Counts
@@ -225,6 +230,10 @@ export default function App() {
     await updateGroceryItem(id, updates);
   };
 
+  const handleUpdateQuantity = async (id: string, newQuantity: string) => {
+    await updateGroceryItem(id, { quantity: newQuantity });
+  };
+
   const handleDeleteItem = async (id: string) => {
     await deleteGroceryItem(id);
   };
@@ -233,6 +242,14 @@ export default function App() {
     if (window.confirm('Clear all bought items from the current list?')) {
       await clearCompletedItems(items);
     }
+  };
+
+  const handleDeleteHistoryItem = async (id: string) => {
+    await deleteHistoryItem(id);
+  };
+
+  const handleClearHistory = async () => {
+    await clearAllHistory(history);
   };
 
   return (
@@ -291,6 +308,37 @@ export default function App() {
                     </button>
                   )}
                 </div>
+              ) : filter.section !== 'all' ? (
+                <div>
+                  <div className="space-y-2">
+                    {filteredItems.map((item) => (
+                      <GroceryItemCard
+                        key={item.id}
+                        item={item}
+                        currentUserEmail={currentUserEmail}
+                        onToggleComplete={handleToggleComplete}
+                        onEdit={(item) => setEditingItem(item)}
+                        onDelete={handleDeleteItem}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        showSectionBadge={filter.section === 'flat'}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Clear Completed Action Button at bottom of list */}
+                  {completedItemsCount > 0 && filter.status !== 'active' && (
+                    <div className="pt-6 pb-2 text-center">
+                      <button
+                        type="button"
+                        onClick={handleClearCompleted}
+                        className="px-4 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors border border-rose-200 dark:border-rose-900/50 inline-flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Clear {completedItemsCount} Bought Items
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div>
                   {/* Render items grouped by Section */}
@@ -305,6 +353,7 @@ export default function App() {
                         onToggleComplete={handleToggleComplete}
                         onEdit={(item) => setEditingItem(item)}
                         onDelete={handleDeleteItem}
+                        onUpdateQuantity={handleUpdateQuantity}
                       />
                     );
                   })}
@@ -319,6 +368,7 @@ export default function App() {
                       onToggleComplete={handleToggleComplete}
                       onEdit={(item) => setEditingItem(item)}
                       onDelete={handleDeleteItem}
+                      onUpdateQuantity={handleUpdateQuantity}
                     />
                   )}
 
@@ -349,6 +399,7 @@ export default function App() {
             onToggleComplete={handleToggleComplete}
             onEdit={(item) => setEditingItem(item)}
             onDelete={handleDeleteItem}
+            onUpdateQuantity={handleUpdateQuantity}
           />
         )}
 
@@ -358,6 +409,8 @@ export default function App() {
             history={history}
             currentUserEmail={currentUserEmail}
             onOpenAuth={() => setIsAuthModalOpen(true)}
+            onDeleteHistoryItem={handleDeleteHistoryItem}
+            onClearHistory={handleClearHistory}
             onReAddToList={(item) => {
               if (!currentUserEmail) {
                 setIsAuthModalOpen(true);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Plus, Search, Calendar, User, ShoppingBag, ArrowUpRight } from 'lucide-react';
+import { History, Plus, Search, Calendar, User, ShoppingBag, ArrowUpRight, Trash2 } from 'lucide-react';
 import { HistoryItem, SECTION_ICONS, AUTHORIZED_USERS } from '../types';
 
 interface HistoryViewProps {
@@ -12,15 +12,26 @@ interface HistoryViewProps {
     section: string;
     supermarkets: string[];
   }) => void;
+  onDeleteHistoryItem?: (id: string) => void;
+  onClearHistory?: () => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ history, currentUserEmail = '', onOpenAuth, onReAddToList }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ 
+  history, 
+  currentUserEmail = '', 
+  onOpenAuth, 
+  onReAddToList,
+  onDeleteHistoryItem,
+  onClearHistory
+}) => {
   const [search, setSearch] = useState('');
 
-  const filteredHistory = history.filter(h => 
-    h.name.toLowerCase().includes(search.toLowerCase()) ||
-    h.section.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredHistory = history
+    .filter(h => 
+      h.name.toLowerCase().includes(search.toLowerCase()) ||
+      h.section.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
   const formatDate = (timestamp: number) => {
     try {
@@ -53,6 +64,26 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, currentUserEm
             </p>
           </div>
         </div>
+
+        {history.length > 0 && onClearHistory && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!currentUserEmail) {
+                if (onOpenAuth) onOpenAuth();
+                return;
+              }
+              if (window.confirm('Are you sure you want to clear all purchase history?')) {
+                onClearHistory();
+              }
+            }}
+            className="px-3 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors border border-rose-200 dark:border-rose-900/50 flex items-center gap-1.5 active:scale-95 shrink-0"
+            title="Clear all purchase history"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear History</span>
+          </button>
+        )}
       </div>
 
       {/* Search Input */}
@@ -117,27 +148,49 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ history, currentUserEm
                   </div>
                 </div>
 
-                {/* Re-add Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!currentUserEmail) {
-                      if (onOpenAuth) onOpenAuth();
-                      return;
-                    }
-                    onReAddToList({
-                      name: item.name,
-                      quantity: item.quantity,
-                      section: item.section,
-                      supermarkets: item.supermarkets && item.supermarkets.length ? item.supermarkets : ['Tesco']
-                    });
-                  }}
-                  className="px-3 py-2 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0 active:scale-95"
-                  title="Add back to current shopping list"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Re-add</span>
-                </button>
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Re-add Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!currentUserEmail) {
+                        if (onOpenAuth) onOpenAuth();
+                        return;
+                      }
+                      onReAddToList({
+                        name: item.name,
+                        quantity: item.quantity,
+                        section: item.section,
+                        supermarkets: item.supermarkets && item.supermarkets.length ? item.supermarkets : ['Tesco']
+                      });
+                    }}
+                    className="px-3 py-2 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0 active:scale-95"
+                    title="Add back to current shopping list"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Re-add</span>
+                  </button>
+
+                  {/* Delete Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!currentUserEmail) {
+                        if (onOpenAuth) onOpenAuth();
+                        return;
+                      }
+                      if (onDeleteHistoryItem) {
+                        onDeleteHistoryItem(item.id);
+                      }
+                    }}
+                    className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 rounded-xl transition-all active:scale-95 shrink-0"
+                    title="Delete from history"
+                    aria-label={`Delete ${item.name} from history`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             );
           })}

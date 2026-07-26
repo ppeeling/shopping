@@ -397,6 +397,37 @@ async function recordItemBoughtHistory(item: GroceryItem, boughtBy: string) {
   }
 }
 
+// Delete History Item
+export async function deleteHistoryItem(id: string) {
+  const local = getLocalHistory();
+  saveLocalHistory(local.filter(h => h.id !== id));
+
+  try {
+    await ensureAuth();
+    if (!id.startsWith('hist-')) {
+      await deleteDoc(doc(db, 'history', id));
+    }
+  } catch (err) {
+    console.warn('Firestore deleteDoc history fallback (stored locally):', err);
+  }
+}
+
+// Clear All History Items
+export async function clearAllHistory(historyItems: HistoryItem[]) {
+  saveLocalHistory([]);
+
+  for (const item of historyItems) {
+    try {
+      await ensureAuth();
+      if (!item.id.startsWith('hist-')) {
+        await deleteDoc(doc(db, 'history', item.id));
+      }
+    } catch (err) {
+      console.warn('Firestore clear history item error:', err);
+    }
+  }
+}
+
 // Update Item
 export async function updateGroceryItem(id: string, updates: Partial<GroceryItem>) {
   const now = Date.now();

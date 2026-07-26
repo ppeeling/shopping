@@ -1,17 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Check if authenticated user's email is in the authorized list
+    function isAuthorizedUser() {
+      return request.auth != null 
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() in [
+          'paulpeeling@gmail.com',
+          'huichiao45@gmail.com'
+        ];
+    }
+
     match /groceries/{document} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuthorizedUser();
     }
 
     match /history/{document} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuthorizedUser();
     }
 
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuthorizedUser();
     }
   }
 }
+
 

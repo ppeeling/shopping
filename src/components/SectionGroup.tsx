@@ -10,6 +10,7 @@ interface SectionGroupProps {
   onToggleComplete: (item: GroceryItem) => void;
   onEdit: (item: GroceryItem) => void;
   onDelete: (id: string) => void;
+  onUpdateQuantity?: (id: string, newQuantity: string) => void;
 }
 
 export const SectionGroup: React.FC<SectionGroupProps> = ({
@@ -18,12 +19,17 @@ export const SectionGroup: React.FC<SectionGroupProps> = ({
   currentUserEmail,
   onToggleComplete,
   onEdit,
-  onDelete
+  onDelete,
+  onUpdateQuantity
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const activeCount = items.filter(i => !i.completed).length;
   const completedCount = items.filter(i => i.completed).length;
+
+  const sortedItems = [...items].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  );
 
   return (
     <div className="space-y-2 mb-4">
@@ -51,7 +57,7 @@ export const SectionGroup: React.FC<SectionGroupProps> = ({
       {/* Items list */}
       {!isCollapsed && (
         <div className="space-y-2 pl-1 sm:pl-2">
-          {items.map((item) => (
+          {sortedItems.map((item) => (
             <GroceryItemCard
               key={item.id}
               item={item}
@@ -59,6 +65,7 @@ export const SectionGroup: React.FC<SectionGroupProps> = ({
               onToggleComplete={onToggleComplete}
               onEdit={onEdit}
               onDelete={onDelete}
+              onUpdateQuantity={onUpdateQuantity}
             />
           ))}
         </div>

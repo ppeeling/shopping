@@ -17,7 +17,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 }) => {
   const hasActiveFilters = 
     filter.search || 
-    filter.section !== 'all' || 
+    (filter.section !== 'all' && filter.section !== 'flat') || 
     filter.supermarket !== 'all' || 
     filter.priority !== 'all';
 
@@ -144,11 +144,24 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           onClick={() => onChangeFilter({ ...filter, section: 'all' })}
           className={`px-3 py-1 rounded-full whitespace-nowrap font-medium transition-all border ${
             filter.section === 'all'
-              ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 border-slate-800 dark:border-slate-200'
+              ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 border-slate-800 dark:border-slate-200 shadow-xs font-semibold'
               : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
           }`}
         >
           All Sections
+        </button>
+        <button
+          type="button"
+          onClick={() => onChangeFilter({ ...filter, section: 'flat' })}
+          className={`px-3 py-1 rounded-full whitespace-nowrap font-medium transition-all border flex items-center gap-1 ${
+            filter.section === 'flat'
+              ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 border-slate-800 dark:border-slate-200 shadow-xs font-semibold'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+          }`}
+          title="Show all items in a single list without section headers"
+        >
+          <List className="w-3.5 h-3.5" />
+          <span>Flat List</span>
         </button>
         {DEFAULT_SECTIONS.map((sec) => (
           <button
