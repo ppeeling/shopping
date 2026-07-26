@@ -1,0 +1,2 @@
+// SemVer version for the application
+export const APP_VERSION = '1.0.0';

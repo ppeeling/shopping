@@ -3,6 +3,7 @@ import { ShoppingCart, ShieldCheck, LogIn, User as UserIcon } from 'lucide-react
 import { ThemeToggle } from './ThemeToggle';
 import { AUTHORIZED_USERS } from '../types';
 import { auth } from '../lib/firebase';
+import { APP_VERSION } from '../version';
 
 interface HeaderProps {
   currentUserEmail: string;
@@ -40,10 +41,13 @@ export const Header: React.FC<HeaderProps> = ({
             <ShoppingCart className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-base sm:text-lg leading-tight tracking-tight text-white flex items-center gap-1.5">
+            <h1 className="font-bold text-base sm:text-lg leading-tight tracking-tight text-white flex items-center gap-1.5 flex-wrap">
               Grocery List
               <span className="text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase">
                 Shared
+              </span>
+              <span className="text-[10px] font-mono font-semibold tracking-tight px-1.5 py-0.5 rounded-md bg-slate-800/90 text-slate-300 border border-slate-700/80 shadow-xs">
+                v{APP_VERSION}
               </span>
             </h1>
             <p className="text-xs text-slate-400 flex items-center gap-1">

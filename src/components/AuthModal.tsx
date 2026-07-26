@@ -3,6 +3,7 @@ import { X, ShieldCheck, LogIn, LogOut, AlertCircle, ExternalLink, Copy, Check, 
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { AUTHORIZED_EMAILS, AUTHORIZED_USERS } from '../types';
+import { APP_VERSION } from '../version';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -256,6 +257,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <ExternalLink className="w-3.5 h-3.5" />
             <span>Open in Standalone Window for Google Auth</span>
           </a>
+
+          <div className="pt-2 text-center">
+            <span className="inline-block text-[10px] font-mono font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/80 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700/60">
+              SemVer v{APP_VERSION}
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -37,6 +37,7 @@ import OfflineBanner from './components/OfflineBanner';
 import UpdateNotification from './components/UpdateNotification';
 import IPhoneInstallPrompt from './components/IPhoneInstallPrompt';
 import BottomNav from './components/BottomNav';
+import { APP_VERSION } from './version';
 
 import { ShoppingBag, CheckCircle2, Trash2, Plus, Sparkles } from 'lucide-react';
 
@@ -425,6 +426,17 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Footer with SemVer version badge */}
+      <footer className="max-w-3xl mx-auto px-4 py-6 text-center text-xs text-slate-400 dark:text-slate-500 pb-28">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 shadow-xs">
+          <span className="font-medium text-slate-600 dark:text-slate-400">Grocery List App</span>
+          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800/50">
+            v{APP_VERSION}
+          </span>
+        </div>
+      </footer>
 
       {/* Bottom Floating Navigation for iPhone / PWA */}
       <BottomNav
