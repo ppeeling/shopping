@@ -127,6 +127,11 @@ export function subscribeToGroceryItems(
   onError?: (error: Error) => void
 ) {
   itemSubscribers.add(callback);
+
+  // 1. Synchronously emit local cached items so UI shows items immediately without waiting
+  const initialLocal = getLocalItems();
+  callback(initialLocal);
+
   ensureAuth();
 
   let unsubscribeFirestore: (() => void) | null = null;
@@ -135,7 +140,7 @@ export function subscribeToGroceryItems(
     const q = query(collection(db, 'groceries'), orderBy('createdAt', 'desc'));
     unsubscribeFirestore = onSnapshot(
       q,
-      (snapshot) => {
+      async (snapshot) => {
         const items: GroceryItem[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
@@ -157,10 +162,29 @@ export function subscribeToGroceryItems(
           });
         });
 
+        // Check if there are unsynced local items that aren't in Firestore yet
+        const currentLocal = getLocalItems();
+        const unsyncedLocals = currentLocal.filter(
+          (loc) => loc.id.startsWith('local-') && !items.some((f) => f.name === loc.name && f.createdAt === loc.createdAt)
+        );
+
+        // Upload unsynced local items to Firestore
+        if (unsyncedLocals.length > 0) {
+          for (const localItem of unsyncedLocals) {
+            try {
+              const { id, ...itemToSync } = localItem;
+              await addDoc(collection(db, 'groceries'), cleanForFirestore(itemToSync));
+            } catch (err) {
+              console.warn('Error syncing local item to Firestore:', err);
+            }
+          }
+        }
+
+        const combinedItems = items;
         try {
-          localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(items));
+          localStorage.setItem(LOCAL_STORAGE_ITEMS_KEY, JSON.stringify(combinedItems));
         } catch {}
-        callback(items);
+        callback(combinedItems);
       },
       (err) => {
         console.warn('Firestore subscription offline or error, using local state:', err);
