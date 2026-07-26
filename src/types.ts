@@ -9,6 +9,7 @@ export interface GroceryItem {
   priority: PriorityLevel;
   completed: boolean;
   notes?: string;
+  imageUrl?: string;
   addedBy: string;
   completedBy?: string;
   completedAt?: number;
@@ -76,13 +77,7 @@ export const DEFAULT_SECTIONS = [
 export const DEFAULT_SUPERMARKETS = [
   'Tesco',
   "Sainsbury's",
-  'Waitrose',
-  'Marks & Spencer',
-  'Aldi',
-  'Lidl',
-  'Costco',
-  'Asian Supermarket',
-  'Local Market'
+  'Waitrose'
 ] as const;
 
 export const SECTION_ICONS: Record<string, string> = {
@@ -101,11 +96,5 @@ export const SECTION_ICONS: Record<string, string> = {
 export const SUPERMARKET_COLORS: Record<string, string> = {
   'Tesco': 'bg-blue-600 text-white border-blue-700',
   "Sainsbury's": 'bg-amber-600 text-white border-amber-700',
-  'Waitrose': 'bg-emerald-700 text-white border-emerald-800',
-  'Marks & Spencer': 'bg-stone-800 text-white border-stone-900',
-  'Aldi': 'bg-sky-700 text-white border-sky-800',
-  'Lidl': 'bg-blue-700 text-white border-blue-800',
-  'Costco': 'bg-red-700 text-white border-red-800',
-  'Asian Supermarket': 'bg-rose-600 text-white border-rose-700',
-  'Local Market': 'bg-teal-600 text-white border-teal-700'
+  'Waitrose': 'bg-emerald-700 text-white border-emerald-800'
 };

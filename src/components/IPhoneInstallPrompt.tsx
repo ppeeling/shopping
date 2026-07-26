@@ -42,7 +42,7 @@ export const IPhoneInstallPrompt: React.FC = () => {
         <div className="space-y-1 text-xs">
           <h4 className="font-bold text-sm text-white">Install App on iPhone</h4>
           <p className="text-slate-300">
-            For native app experience with offline support:
+            Enables sharing photos & items directly from Photos or Safari to your grocery list:
           </p>
           <div className="flex items-center gap-1.5 text-emerald-400 font-semibold pt-1">
             <span>1. Tap Share</span>

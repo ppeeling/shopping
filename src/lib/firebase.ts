@@ -148,6 +148,7 @@ export function subscribeToGroceryItems(
             priority: data.priority || 'medium',
             completed: Boolean(data.completed),
             notes: data.notes || '',
+            imageUrl: data.imageUrl || undefined,
             addedBy: data.addedBy || 'paulpeeling@gmail.com',
             completedBy: data.completedBy,
             completedAt: data.completedAt,
@@ -320,23 +321,48 @@ export async function toggleGroceryCompleted(
   }
 }
 
-// Record Item Purchase History
+function isSameCalendarDay(t1: number, t2: number): boolean {
+  const d1 = new Date(t1);
+  const d2 = new Date(t2);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
+
+// Record Item Purchase History (at most once per item per calendar day)
 async function recordItemBoughtHistory(item: GroceryItem, boughtBy: string) {
+  const now = Date.now();
+  const localHist = getLocalHistory();
+
+  // Check if a purchase for this item (by ID or matching name) was already recorded today
+  const recordedToday = localHist.some((h) => {
+    const sameItem =
+      (h.itemId && h.itemId === item.id) ||
+      (h.name && h.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+    return sameItem && isSameCalendarDay(h.boughtAt, now);
+  });
+
+  if (recordedToday) {
+    // Already recorded for today; do not duplicate
+    return;
+  }
+
   const historyData = {
     itemId: item.id,
     name: item.name,
     quantity: item.quantity,
     section: item.section,
     supermarkets: item.supermarkets,
-    boughtAt: Date.now(),
+    boughtAt: now,
     boughtBy: boughtBy,
     timesBought: 1
   };
 
-  const localHist = getLocalHistory();
   const newHist: HistoryItem = {
     ...historyData,
-    id: `hist-${Date.now()}`
+    id: `hist-${now}`
   };
   saveLocalHistory([newHist, ...localHist]);
 

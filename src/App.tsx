@@ -103,10 +103,22 @@ export default function App() {
   useEffect(() => {
     registerServiceWorker(() => setHasUpdate(true));
 
-    const shared = parseSharedTargetContent();
-    if (shared) {
-      setSharedData(shared);
-    }
+    const checkSharedContent = async () => {
+      const shared = await parseSharedTargetContent();
+      if (shared) {
+        setSharedData(shared);
+      }
+    };
+    checkSharedContent();
+
+    // Also listen for visibility change to re-check if app comes to foreground after sharing
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSharedContent();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   // Sync Firebase Auth State
@@ -211,6 +223,7 @@ export default function App() {
     supermarkets: string[];
     priority: PriorityLevel;
     notes?: string;
+    imageUrl?: string;
   }) => {
     await addGroceryItem({
       ...item,

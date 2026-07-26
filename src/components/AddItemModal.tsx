@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Sparkles, Store, Layers, AlertCircle, StickyNote } from 'lucide-react';
+import { X, Plus, Camera, Trash2, Loader2 } from 'lucide-react';
 import { DEFAULT_SECTIONS, DEFAULT_SUPERMARKETS, PriorityLevel, SECTION_ICONS } from '../types';
+import { compressImage } from '../lib/imageUtils';
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface AddItemModalProps {
     supermarkets: string[];
     priority: PriorityLevel;
     notes?: string;
+    imageUrl?: string;
   }) => void;
   initialName?: string;
   initialSupermarket?: string;
@@ -30,6 +32,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [selectedSupermarkets, setSelectedSupermarkets] = useState<string[]>([initialSupermarket]);
   const [priority, setPriority] = useState<PriorityLevel>('medium');
   const [notes, setNotes] = useState('');
+  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   useEffect(() => {
     if (initialName) {
@@ -40,7 +44,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Smart section auto-suggestion
   const autoSuggestSection = (itemName: string) => {
     const lower = itemName.toLowerCase();
     if (lower.includes('milk') || lower.includes('cheese') || lower.includes('butter') || lower.includes('egg') || lower.includes('yogurt') || lower.includes('cream')) {
@@ -77,6 +80,21 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     }
   };
 
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsCompressing(true);
+      const compressed = await compressImage(file);
+      setImageUrl(compressed);
+    } catch (err) {
+      console.error('Failed to compress image:', err);
+    } finally {
+      setIsCompressing(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -87,20 +105,21 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       section,
       supermarkets: selectedSupermarkets.length > 0 ? selectedSupermarkets : ['Tesco'],
       priority,
-      notes: notes.trim() || ''
+      notes: notes.trim() || '',
+      imageUrl
     });
 
     // Reset form
     setName('');
     setQuantity('1');
     setNotes('');
+    setImageUrl(undefined);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-fade-in">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
@@ -135,7 +154,52 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
             />
           </div>
 
-          {/* Quantity & Priority in two columns */}
+          {/* Photo / Image Upload */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Photo / Image (Optional)
+            </label>
+            {imageUrl ? (
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 max-h-48 flex items-center justify-center">
+                <img
+                  src={imageUrl}
+                  alt="Item photo"
+                  className="max-h-48 w-full object-contain bg-slate-950/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setImageUrl(undefined)}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-rose-600 text-white hover:bg-rose-700 shadow-md transition-all"
+                  title="Remove photo"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer transition-colors">
+                {isCompressing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                    <span>Processing photo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>Take Photo or Choose Image</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                  disabled={isCompressing}
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Quantity & Priority */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -237,7 +301,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-98 flex items-center justify-center gap-2"
+              disabled={isCompressing}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-98 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               Add to Grocery List
